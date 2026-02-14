@@ -121,6 +121,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. Camera Initialization
     async function initCamera() {
+        // Prevent starting camera if not in scan mode
+        if (scannerView.classList.contains('hidden')) return;
+        
         try {
             cameraErrorDiv.classList.add('hidden');
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -133,7 +136,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    initCamera();
+    // Do NOT auto-start camera on load.
+    // It's handled by switchMode() or manual click.
+    // initCamera();
 
     retryCameraBtn.addEventListener('click', initCamera);
 

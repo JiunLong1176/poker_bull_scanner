@@ -269,6 +269,8 @@ main {
     cursor: pointer;
     font-size: 0.9rem;
     backdrop-filter: blur(5px);
+    touch-action: manipulation; /* Prevent double-tap zoom on buttons */
+    user-select: none; /* Prevent text selection */
 }
 
 .mode-btn.active {
@@ -343,6 +345,8 @@ main {
     display: flex;
     align-items: center;
     justify-content: center;
+    touch-action: manipulation; /* Prevent double-tap zoom */
+    user-select: none;
 }
 
 .key-btn:active {
