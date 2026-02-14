@@ -81,8 +81,9 @@ main {
 }
 
 .scan-area {
-    width: 80%;
-    height: 200px; /* Adjust as needed for card aspect ratio */
+    width: 90%; /* Increased width */
+    max-width: 500px; /* Max width for larger screens */
+    height: 300px; /* Increased height */
     border: 2px solid var(--accent-color);
     border-radius: 12px;
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); /* Dim outside area */
@@ -124,12 +125,13 @@ main {
 
 .controls {
     position: absolute;
-    bottom: 30px;
+    bottom: 10%; /* Use percentage instead of fixed pixel value to adapt to different screen heights */
     left: 0;
     right: 0;
     display: flex;
     justify-content: center;
     padding: 20px;
+    padding-bottom: env(safe-area-inset-bottom, 20px); /* Respect iOS home indicator area */
     z-index: 20;
     background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
 }
