@@ -245,6 +245,135 @@ main {
     100% { transform: rotate(360deg); }
 }
 
+/* Mode Switcher */
+.mode-switcher {
+    position: absolute;
+    top: 70px; /* Below header */
+    left: 0;
+    right: 0;
+    z-index: 25;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
+    background: transparent; /* Ensure no background block */
+    pointer-events: auto; /* Ensure clickable */
+}
+
+.mode-btn {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    backdrop-filter: blur(5px);
+}
+
+.mode-btn.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    font-weight: bold;
+}
+
+/* Manual Input View */
+.manual-container {
+    /* Increased top padding to push content down below the mode switcher */
+    padding: 130px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.selected-cards {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+    width: 100%;
+    justify-content: center;
+}
+
+.card-slot {
+    width: 50px;
+    height: 70px;
+    background: rgba(255,255,255,0.1);
+    border: 2px dashed rgba(255,255,255,0.3);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: var(--accent-color);
+}
+
+.card-slot.filled {
+    background: white;
+    color: black;
+    border-style: solid;
+}
+
+.keyboard {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.keyboard-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.key-btn {
+    flex: 1;
+    height: 50px;
+    background: #333;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.key-btn:active {
+    background: #555;
+}
+
+.action-btn {
+    background: #d32f2f;
+    flex: 1.5; /* Slightly wider */
+}
+
+.submit-btn {
+    width: 100%;
+    max-width: 400px;
+    padding: 15px;
+    background: var(--accent-color);
+    color: black;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: auto; /* Push to bottom if space permits */
+}
+
+.submit-btn:disabled {
+    background: #555;
+    color: #888;
+    cursor: not-allowed;
+}
+
 /* Results Modal/Overlay */
 #result-container {
     position: absolute;

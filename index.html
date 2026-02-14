@@ -16,7 +16,50 @@
             <h1>Poker Bull Scanner</h1>
         </header>
         
-        <main>
+        <nav class="mode-switcher">
+            <button id="mode-manual" class="mode-btn active">Manual Input</button>
+            <button id="mode-scan" class="mode-btn">Scanner</button>
+        </nav>
+
+        <main id="manual-view">
+            <div class="manual-container">
+                <h2>Select 5 Cards</h2>
+                <div class="selected-cards">
+                    <div class="card-slot" data-index="0"></div>
+                    <div class="card-slot" data-index="1"></div>
+                    <div class="card-slot" data-index="2"></div>
+                    <div class="card-slot" data-index="3"></div>
+                    <div class="card-slot" data-index="4"></div>
+                </div>
+                
+                <div class="keyboard">
+                    <div class="keyboard-row">
+                        <button class="key-btn" data-val="A">A</button>
+                        <button class="key-btn" data-val="2">2</button>
+                        <button class="key-btn" data-val="3">3</button>
+                        <button class="key-btn" data-val="4">4</button>
+                        <button class="key-btn" data-val="5">5</button>
+                    </div>
+                    <div class="keyboard-row">
+                        <button class="key-btn" data-val="6">6</button>
+                        <button class="key-btn" data-val="7">7</button>
+                        <button class="key-btn" data-val="8">8</button>
+                        <button class="key-btn" data-val="9">9</button>
+                        <button class="key-btn" data-val="10">10</button>
+                    </div>
+                    <div class="keyboard-row">
+                        <button class="key-btn" data-val="J">J</button>
+                        <button class="key-btn" data-val="Q">Q</button>
+                        <button class="key-btn" data-val="K">K</button>
+                        <button class="key-btn action-btn" id="clear-btn">DEL</button>
+                    </div>
+                </div>
+
+                <button id="manual-submit-btn" class="submit-btn" disabled>Calculate Bull</button>
+            </div>
+        </main>
+
+        <main id="scanner-view" class="hidden">
             <div class="camera-container">
                 <video id="camera-stream" autoplay playsinline></video>
                 <canvas id="capture-canvas" style="display:none;"></canvas>
@@ -37,22 +80,23 @@
                     <div class="btn-inner"></div>
                 </button>
             </div>
-
-            <div id="loading" class="hidden">
-                <div class="spinner"></div>
-                <p>Analyzing...</p>
-            </div>
-
-            <div id="result-container" class="hidden">
-                <h2>
-                    Result
-                    <button id="close-results">&times;</button>
-                </h2>
-                <div id="cards-detected" class="card-display"></div>
-                <div id="final-result" class="bull-result"></div>
-                <div id="bull-calculation" class="bull-details"></div>
-            </div>
         </main>
+
+        <!-- Shared Components -->
+        <div id="loading" class="hidden">
+            <div class="spinner"></div>
+            <p>Analyzing...</p>
+        </div>
+
+        <div id="result-container" class="hidden">
+            <h2>
+                Result
+                <button id="close-results">&times;</button>
+            </h2>
+            <div id="cards-detected" class="card-display"></div>
+            <div id="final-result" class="bull-result"></div>
+            <div id="bull-calculation" class="bull-details"></div>
+        </div>
     </div>
 
     <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>

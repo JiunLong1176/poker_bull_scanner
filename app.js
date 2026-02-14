@@ -7,17 +7,117 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 2. UI Elements
+    // Views
+    const scannerView = document.getElementById('scanner-view');
+    const manualView = document.getElementById('manual-view');
+    const modeScanBtn = document.getElementById('mode-scan');
+    const modeManualBtn = document.getElementById('mode-manual');
+
+    // Scanner Elements
     const video = document.getElementById('camera-stream');
     const canvas = document.getElementById('capture-canvas');
     const scanBtn = document.getElementById('scan-btn');
+    const cameraErrorDiv = document.getElementById('camera-error');
+    const retryCameraBtn = document.getElementById('retry-camera');
+
+    // Manual Elements
+    const cardSlots = document.querySelectorAll('.card-slot');
+    // Removed duplicate declaration of keyBtns and clearBtn here to avoid conflict
+    // They are selected inside the logic blocks or via specific selectors
+    const manualSubmitBtn = document.getElementById('manual-submit-btn');
+
+    // Shared Elements
     const loadingDiv = document.getElementById('loading');
     const resultContainer = document.getElementById('result-container');
     const closeResultsBtn = document.getElementById('close-results');
     const cardsDetectedDiv = document.getElementById('cards-detected');
     const bullCalculationDiv = document.getElementById('bull-calculation');
     const finalResultDiv = document.getElementById('final-result');
-    const cameraErrorDiv = document.getElementById('camera-error');
-    const retryCameraBtn = document.getElementById('retry-camera');
+
+    // State for Manual Mode
+    let manualCards = [];
+
+    // --- MODE SWITCHING ---
+    // Initialize Manual Mode as default
+    // We do this by simulating a click or setting classes directly
+    // Let's set manual active by default
+    
+    function switchMode(mode) {
+        if (mode === 'scan') {
+            scannerView.classList.remove('hidden');
+            manualView.classList.add('hidden');
+            modeScanBtn.classList.add('active');
+            modeManualBtn.classList.remove('active');
+            initCamera(); // Ensure camera is running
+        } else {
+            scannerView.classList.add('hidden');
+            manualView.classList.remove('hidden');
+            modeScanBtn.classList.remove('active');
+            modeManualBtn.classList.add('active');
+            
+            // Stop camera stream if active to save resources?
+            if (video.srcObject) {
+                const tracks = video.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+                video.srcObject = null;
+            }
+        }
+    }
+    
+    // Bind listeners
+    modeScanBtn.addEventListener('click', () => switchMode('scan'));
+    modeManualBtn.addEventListener('click', () => switchMode('manual'));
+
+    // Set default mode: Manual
+    switchMode('manual');
+
+    // --- MANUAL INPUT LOGIC ---
+    
+    // Separate listener for valid card keys only
+    document.querySelectorAll('.key-btn:not(#clear-btn)').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const val = btn.dataset.val;
+            if (val && manualCards.length < 5) {
+                manualCards.push(val);
+                updateCardSlots();
+            }
+        });
+    });
+
+    // Specific listener for clear button
+    const clearBtnEl = document.getElementById('clear-btn'); // Renamed variable to avoid conflict
+    if (clearBtnEl) {
+        clearBtnEl.addEventListener('click', (e) => {
+            e.stopPropagation(); // Stop bubbling
+            if (manualCards.length > 0) {
+                manualCards.pop();
+                updateCardSlots();
+            }
+        });
+    }
+
+    function updateCardSlots() {
+        const slots = document.querySelectorAll('.card-slot');
+        slots.forEach((slot, index) => {
+            if (manualCards[index]) {
+                slot.textContent = manualCards[index];
+                slot.classList.add('filled');
+            } else {
+                slot.textContent = '';
+                slot.classList.remove('filled');
+            }
+        });
+        
+        if(manualSubmitBtn) manualSubmitBtn.disabled = manualCards.length !== 5;
+    }
+
+    if (manualSubmitBtn) {
+        manualSubmitBtn.addEventListener('click', () => {
+            const result = calculateBull(manualCards);
+            displayResults(manualCards, result);
+            document.getElementById('result-container').classList.remove('hidden');
+        });
+    }
 
     // 3. Camera Initialization
     async function initCamera() {
@@ -194,34 +294,147 @@ document.addEventListener('DOMContentLoaded', () => {
         return parseInt(card, 10);
     }
 
+    // New Priority System for Bull Calculation
+    // In Bull Bull (Niu Niu), sometimes multiple combos exist.
+    // Usually, the best possible hand is the one that matters.
+    // However, the standard rule is simply: If ANY 3 cards sum to a multiple of 10,
+    // the remaining 2 determine the score.
+    // If multiple combinations of 3 exist, do they result in different scores?
+    // Let's trace:
+    // Cards: 10, 10, 10, 3, 2
+    // Values: 10, 10, 10, 3, 2. Total = 35.
+    // Combo 1: 10+10+10 = 30 (Multiple of 10). Remainder: 3+2 = 5. Bull 5.
+    // Combo 2: 10+3+??? No other 3-card combo sums to 10/20/30 easily?
+    // Wait, let's re-read the user's claim: "10, 10, 10, 3, 2, suppose should be bull 8"
+    // User says: "3 can change 6, 6+2 is 8" -> This sounds like a specific local variant or I misunderstood the user.
+    // STANDARD RULES:
+    // 3 cards sum to multiple of 10.
+    // Remainder sums to X. Bull is X % 10.
+    // User's example: 10, 10, 10, 3, 2.
+    // 10+10+10=30. Remainder 3+2=5. Bull 5.
+    // User claims Bull 8. Why? "3 can change 6"?
+    // Ah, is the user playing a variant where "3" counts as "3 or 6"? Or maybe "3" and "6" are interchangeable?
+    // OR, did the user mean specific cards?
+    // "Review the entire calculation and correct it"
+    // Let's stick to standard logic FIRST, but ensure we find the BEST bull if multiple exist.
+    // Standard Bull Bull: Calculate total sum. If 3 cards sum % 10 == 0, then (Total - 3cards) % 10 is the bull.
+    // (Total % 10) should be equal to (Remainder % 10).
+    // So mathematically, if a Bull exists, the result is ALWAYS (Total Sum) % 10.
+    // Let's verify:
+    // Total = 35. 35 % 10 = 5.
+    // Remainder = 5. 5 % 10 = 5.
+    // So mathematically, if a valid 3-card combo exists, the Bull value is FIXED by the total sum.
+    // There cannot be "different" bull results for the same hand in standard rules.
+    // Unless the card values themselves are different (e.g. Gongpai rules where JQK are 10 but maybe face cards have score?)
+    //
+    // WAIT. If the user says "3 can change 6", that sounds like a very specific wildcard rule or "insane" rule.
+    // "10, 10, 10, 3, 2".
+    // If 3 becomes 6: 10, 10, 10, 6, 2.
+    // 10+10+10=30. Remainder 6+2=8. Bull 8.
+    // This implies a variant rule: "3 is a wildcard for 6" or similar?
+    // Since I cannot ask for clarification easily without breaking flow, I will implement a flexible "Best Bull" search.
+    // BUT, standard Niu Niu does not have "3 changes to 6".
+    // Maybe the user meant the card "3" looks like "6" (OCR error)?
+    // No, they entered manual input likely.
+    // Let's assume the user knows their rules better than I do about this "3 -> 6" thing,
+    // OR they might be confused.
+    // However, looking at standard "Bull Bull", my code is correct (Bull 5).
+    // If I want to support this specific request ("3 can change 6"), I'd have to code a variant.
+    // "3 can change 6" -> Maybe 3 and 6 are interchangeable?
+    // Let's assume standard rules first but check if I missed a "highest possible" logic.
+    //
+    // Actually, maybe the user implies the input was "10, 10, 10, 6, 2" but the OCR read it as 3?
+    // "the result is incorrect cause if choose 10, 10, 10, 3, 2" -> They imply they CHOSE these.
+    // If I must implement "3 counts as 3 OR 6", that's a big assumption.
+    //
+    // Alternative interpretation: "Bull 8" from 10,10,10,3,2?
+    // 10+10+3+2 = 25? No.
+    // 10+3+2 = 15? No.
+    //
+    // Let's look at the "User Message" again: "3 can change 6, 6+ 2 is 8".
+    // This is explicitly stating a transformation rule.
+    // "3 can become 6".
+    // Is there a rule where 3 and 6 are swappable? Or maybe '3' and '6' look alike?
+    // Or maybe this is "广东牛牛" or a specific variant?
+    //
+    // Since I must fix it according to user, I will implement a variant logic check:
+    // If a card is '3', try it as '3' AND '6'.
+    // See which yields the higher Bull.
+    
     function calculateBull(cards) {
         if (cards.length < 5) {
             return { type: 'Error', message: `Found only ${cards.length} cards.` };
         }
 
-        const values = cards.map(getCardValue);
-        const sum = values.reduce((a, b) => a + b, 0);
+        // Helper to solve for a specific set of values
+        function solve(currentValues) {
+            const sum = currentValues.reduce((a, b) => a + b, 0);
+            let bestResult = { type: 'No Bull', value: 0 };
 
-        for (let i = 0; i < 5; i++) {
-            for (let j = i + 1; j < 5; j++) {
-                for (let k = j + 1; k < 5; k++) {
-                    const subSum = values[i] + values[j] + values[k];
-                    if (subSum % 10 === 0) {
-                        const remainingSum = sum - subSum;
-                        let bull = remainingSum % 10;
-                        if (bull === 0) bull = 10;
-                        
-                        return {
-                            type: 'Bull',
-                            value: bull,
-                            combo: [cards[i], cards[j], cards[k]], // Indices would be safer but cards are strings
-                            remainder: cards.filter((_, idx) => ![i, j, k].includes(idx))
-                        };
+            for (let i = 0; i < 5; i++) {
+                for (let j = i + 1; j < 5; j++) {
+                    for (let k = j + 1; k < 5; k++) {
+                        const subSum = currentValues[i] + currentValues[j] + currentValues[k];
+                        if (subSum % 10 === 0) {
+                            const remainingSum = sum - subSum;
+                            let bull = remainingSum % 10;
+                            if (bull === 0) bull = 10;
+                            
+                            // Found a bull. Is it better than what we have?
+                            if (bestResult.type === 'No Bull' || bull > bestResult.value) {
+                                bestResult = {
+                                    type: 'Bull',
+                                    value: bull,
+                                    combo: [cards[i], cards[j], cards[k]],
+                                    remainder: cards.filter((_, idx) => ![i, j, k].includes(idx))
+                                };
+                            }
+                        }
                     }
                 }
             }
+            return bestResult;
         }
-        return { type: 'No Bull', value: 0 };
+
+        // 1. Standard Calculation
+        const baseValues = cards.map(getCardValue);
+        let bestOutcome = solve(baseValues);
+
+        // 2. Variant Rule Check: "3 can be 6" (and maybe 6 can be 3?)
+        // The user specifically said "3 can change 6".
+        // Let's generate permutations if there are 3s or 6s.
+        // Actually, let's strictly follow "3 can change 6".
+        // Does 6 change to 3? Usually these rules are bidirectional or specific.
+        // Let's allow 3 -> 6 substitution to see if it improves the hand.
+        
+        const indicesOf3 = [];
+        cards.forEach((c, idx) => { if (c === '3') indicesOf3.push(idx); });
+
+        if (indicesOf3.length > 0) {
+            // We have 3s. Let's try permutations where each 3 could be a 6.
+            // 2^n permutations.
+            const numPermutations = 1 << indicesOf3.length;
+            
+            for (let i = 1; i < numPermutations; i++) { // Start at 1 because 0 is original
+                const newValues = [...baseValues];
+                for (let bit = 0; bit < indicesOf3.length; bit++) {
+                    if ((i >> bit) & 1) {
+                        newValues[indicesOf3[bit]] = 6; // Swap value to 6
+                    }
+                }
+                
+                const outcome = solve(newValues);
+                if (outcome.type === 'Bull') {
+                     if (bestOutcome.type === 'No Bull' || outcome.value > bestOutcome.value) {
+                         bestOutcome = outcome;
+                         // Mark that we used a variant rule?
+                         // bestOutcome.variant = "3 as 6";
+                     }
+                }
+            }
+        }
+        
+        return bestOutcome;
     }
 
     function displayResults(cards, result) {
@@ -247,14 +460,30 @@ document.addEventListener('DOMContentLoaded', () => {
             finalResultDiv.style.color = '#ccc';
             bullCalculationDiv.innerHTML = '<p>No combination sums to multiple of 10.</p>';
         } else {
-            const bullText = result.value === 10 ? 'BULL BULL! 🐂' : `Bull ${result.value} 🐮`;
+            let bullText = '';
+            let color = '#FFC107'; // Default Gold
+
+            if (result.type === '5 Ultimate Bulls') {
+                bullText = 'ULTIMATE BULL! 👑';
+                color = '#E91E63'; // Pink/Red for special
+            } else if (result.value === 10) {
+                bullText = 'BULL BULL! 🐂';
+            } else {
+                bullText = `Bull ${result.value} 🐮`;
+            }
+
             finalResultDiv.textContent = bullText;
-            finalResultDiv.style.color = '#FFC107'; // Accent
+            finalResultDiv.style.color = color;
             
-            bullCalculationDiv.innerHTML = `
-                <p>Combo: ${result.combo.join('+')} = ${result.combo.reduce((a,c)=>a+getCardValue(c),0)}</p>
-                <p>Points: ${result.remainder.join('+')} = ${result.remainder.reduce((a,c)=>a+getCardValue(c),0)}</p>
-            `;
+            // For 5 Ultimate, combo/remainder logic is trivial, maybe just show "All Face Cards"
+            if (result.type === '5 Ultimate Bulls') {
+                bullCalculationDiv.innerHTML = `<p>All J/Q/K cards!</p>`;
+            } else {
+                bullCalculationDiv.innerHTML = `
+                    <p>Combo: ${result.combo.join('+')}</p>
+                    <p>Points: ${result.remainder.join('+')}</p>
+                `;
+            }
         }
     }
 });
