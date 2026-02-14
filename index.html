@@ -95,8 +95,32 @@
                 <button id="close-results">&times;</button>
             </h2>
             <div id="cards-detected" class="card-display"></div>
+            <p class="hint-text" style="text-align:center; font-size:0.8rem; color:#888; margin-top:-10px; margin-bottom:10px;">Tap any card to correct it</p>
             <div id="final-result" class="bull-result"></div>
             <div id="bull-calculation" class="bull-details"></div>
+        </div>
+
+        <!-- Card Correction Modal -->
+        <div id="correction-modal" class="hidden">
+            <div class="modal-content">
+                <h3>Correct Card</h3>
+                <div class="correction-grid">
+                    <button class="correct-btn" data-val="A">A</button>
+                    <button class="correct-btn" data-val="2">2</button>
+                    <button class="correct-btn" data-val="3">3</button>
+                    <button class="correct-btn" data-val="4">4</button>
+                    <button class="correct-btn" data-val="5">5</button>
+                    <button class="correct-btn" data-val="6">6</button>
+                    <button class="correct-btn" data-val="7">7</button>
+                    <button class="correct-btn" data-val="8">8</button>
+                    <button class="correct-btn" data-val="9">9</button>
+                    <button class="correct-btn" data-val="10">10</button>
+                    <button class="correct-btn" data-val="J">J</button>
+                    <button class="correct-btn" data-val="Q">Q</button>
+                    <button class="correct-btn" data-val="K">K</button>
+                </div>
+                <button id="close-correction" style="margin-top:15px; padding:10px 20px; background:#333; color:white; border:none; border-radius:8px;">Cancel</button>
+            </div>
         </div>
     </div>
 

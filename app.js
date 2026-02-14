@@ -34,6 +34,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const bullCalculationDiv = document.getElementById('bull-calculation');
     const finalResultDiv = document.getElementById('final-result');
 
+    // Correction Modal Elements
+    const correctionModal = document.getElementById('correction-modal');
+    const closeCorrectionBtn = document.getElementById('close-correction');
+    let currentEditingIndex = -1;
+    let currentResultCards = [];
+
     // State for Manual Mode
     let manualCards = [];
 
@@ -438,11 +444,21 @@ document.addEventListener('DOMContentLoaded', () => {
         finalResultDiv.innerHTML = '';
         bullCalculationDiv.innerHTML = '';
 
+        // Store current cards for editing
+        currentResultCards = [...cards];
+
         // Show detected cards
-        cards.forEach(card => {
+        cards.forEach((card, index) => {
             const span = document.createElement('span');
             span.className = 'card';
             span.textContent = card;
+            span.style.cursor = 'pointer'; // Indicate clickability
+            
+            // Add click listener to edit this specific card
+            span.addEventListener('click', () => {
+                openCorrectionModal(index);
+            });
+            
             cardsDetectedDiv.appendChild(span);
         });
 
@@ -480,5 +496,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
         }
+    }
+
+    // --- CORRECTION LOGIC ---
+    function openCorrectionModal(index) {
+        currentEditingIndex = index;
+        correctionModal.classList.remove('hidden');
+    }
+
+    document.querySelectorAll('.correct-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (currentEditingIndex > -1) {
+                const newVal = btn.dataset.val;
+                currentResultCards[currentEditingIndex] = newVal;
+                
+                // Recalculate with new card
+                const newResult = calculateBull(currentResultCards);
+                
+                // Update display
+                displayResults(currentResultCards, newResult);
+                
+                // Close modal
+                correctionModal.classList.add('hidden');
+            }
+        });
+    });
+
+    if (closeCorrectionBtn) {
+        closeCorrectionBtn.addEventListener('click', () => {
+            correctionModal.classList.add('hidden');
+        });
     }
 });

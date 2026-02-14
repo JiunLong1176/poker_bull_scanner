@@ -404,6 +404,52 @@ main {
     cursor: not-allowed;
 }
 
+/* Correction Modal */
+#correction-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 15px;
+    text-align: center;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.correction-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-top: 15px;
+}
+
+.correct-btn {
+    padding: 10px 0;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 5px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.correct-btn:active {
+    background: var(--accent-color);
+    color: black;
+}
+
 /* Results Modal/Overlay */
 #result-container {
     position: absolute;
