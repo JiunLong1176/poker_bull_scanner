@@ -321,41 +321,67 @@ main {
 .keyboard {
     width: 100%;
     max-width: 400px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
     margin-bottom: 20px;
+    flex: 1; /* Allow keyboard to take available space */
 }
 
-.keyboard-row {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
+.keyboard-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); /* 4 columns */
+    gap: 12px; /* Space between buttons */
+    height: 100%;
+    max-height: 450px; /* Prevent it from getting too tall */
 }
 
 .key-btn {
-    flex: 1;
-    height: 50px;
+    height: 60px; /* Taller buttons */
     background: #333;
     border: none;
-    border-radius: 8px;
+    border-radius: 12px; /* Softer corners */
     color: white;
-    font-size: 1.1rem;
+    font-size: 1.4rem; /* Larger text */
+    font-weight: bold;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    touch-action: manipulation; /* Prevent double-tap zoom */
+    touch-action: manipulation;
     user-select: none;
+    transition: background-color 0.1s;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.2); /* 3D effect */
 }
 
 .key-btn:active {
     background: #555;
+    transform: translateY(2px); /* Press effect */
+    box-shadow: 0 2px 0 rgba(0,0,0,0.2);
 }
 
 .action-btn {
-    background: #d32f2f;
-    flex: 1.5; /* Slightly wider */
+    background: #d32f2f; /* Red for Delete */
+    font-size: 1.2rem;
+}
+
+.action-btn:active {
+    background: #b71c1c;
+}
+
+.clear-all-btn {
+    background: #ff9800; /* Orange for Clear All */
+    font-size: 1.1rem;
+}
+
+.clear-all-btn:active {
+    background: #f57c00;
+}
+
+/* Span helpers */
+.span-2 {
+    grid-column: span 2;
+}
+
+.span-3 {
+    grid-column: span 3;
 }
 
 .submit-btn {

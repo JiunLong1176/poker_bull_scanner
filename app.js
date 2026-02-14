@@ -74,9 +74,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- MANUAL INPUT LOGIC ---
     
     // Separate listener for valid card keys only
-    document.querySelectorAll('.key-btn:not(#clear-btn)').forEach(btn => {
+    // Exclude action buttons by ID or class logic if needed,
+    // but relying on data-val check is safer.
+    document.querySelectorAll('.key-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const val = btn.dataset.val;
+            // Only add if it has a value (action buttons like DEL don't have data-val)
             if (val && manualCards.length < 5) {
                 manualCards.push(val);
                 updateCardSlots();
@@ -84,15 +87,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Specific listener for clear button
-    const clearBtnEl = document.getElementById('clear-btn'); // Renamed variable to avoid conflict
-    if (clearBtnEl) {
-        clearBtnEl.addEventListener('click', (e) => {
-            e.stopPropagation(); // Stop bubbling
+    // DEL Button (Remove last card)
+    // Note: ID changed from clear-btn to del-btn in HTML
+    const delBtnEl = document.getElementById('del-btn') || document.getElementById('clear-btn');
+    if (delBtnEl) {
+        delBtnEl.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (manualCards.length > 0) {
                 manualCards.pop();
                 updateCardSlots();
             }
+        });
+    }
+
+    // CLEAR ALL Button
+    const clearAllBtn = document.getElementById('clear-all-btn');
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            manualCards = []; // Reset array
+            updateCardSlots();
         });
     }
 
