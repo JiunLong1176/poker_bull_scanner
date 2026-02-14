@@ -63,7 +63,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Scan failed:', error);
-            alert('Failed to scan: ' + error.message);
+            // Check if it's our specific "No cards" error
+            if (error.message === 'No cards detected via OCR') {
+                 displayResults([], { type: 'Error', message: 'No cards detected. Please try again closer or with better lighting.' });
+                 resultContainer.classList.remove('hidden'); // Ensure results are shown
+            } else {
+                 alert('Failed to scan: ' + error.message);
+            }
         } finally {
             loadingDiv.classList.add('hidden');
             resultContainer.classList.remove('hidden');
@@ -75,59 +81,48 @@ document.addEventListener('DOMContentLoaded', () => {
         resultContainer.classList.add('hidden');
     });
 
-    // 5. Google Cloud Vision API Integration
-    const API_KEY = 'YOUR_GOOGLE_CLOUD_VISION_API_KEY'; 
-    const VISION_API_URL = `https://vision.googleapis.com/v1/images:annotate?key=${API_KEY}`;
-
+    // 5. Tesseract.js Integration
     async function identifyCards(base64Image) {
-        // Mock Mode Check
-        if (API_KEY === 'YOUR_GOOGLE_CLOUD_VISION_API_KEY') {
-             console.log('Using Mock Data');
-             return new Promise(resolve => setTimeout(() => {
-                const scenarios = [
-                    ['A', 'K', 'Q', 'J', '10'], // Bull 10
-                    ['2', '3', '5', '8', '9'],  // Bull 7
-                    ['A', '2', '3', '4', '6'],   // No Bull
-                    ['10', '10', '10', '10', 'K'] // Bomb/4 of a kind (Logic might just see Bull 10)
-                ];
-                resolve(scenarios[Math.floor(Math.random() * scenarios.length)]);
-            }, 1000));
-        }
-
-        const requestBody = {
-            requests: [{
-                image: { content: base64Image },
-                features: [{ type: 'TEXT_DETECTION' }]
-            }]
-        };
-
         try {
-            const response = await fetch(VISION_API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            });
-            const data = await response.json();
-            
-            if (!data.responses || !data.responses[0].textAnnotations) {
-                throw new Error('No text detected');
-            }
+            // Tesseract.js works with image URLs or base64
+            // We need to add the prefix for base64 if it's missing, though our caller passes raw base64 usually
+            // but Tesseract.recognize handles various inputs.
+            // Let's ensure we pass a valid image source.
+            const imageSrc = `data:image/jpeg;base64,${base64Image}`;
 
-            const fullText = data.responses[0].textAnnotations[0].description;
+            const result = await Tesseract.recognize(
+                imageSrc,
+                'eng',
+                {
+                    logger: m => {
+                        console.log(m);
+                        if (m.status === 'recognizing text') {
+                            const loadingText = document.querySelector('#loading p');
+                            if (loadingText) loadingText.textContent = `Analyzing... ${Math.round(m.progress * 100)}%`;
+                        }
+                    }
+                }
+            );
+
+            const fullText = result.data.text;
+            console.log("Recognized Text:", fullText);
+            
             const detected = parseCardsFromText(fullText);
             
             if (detected.length < 5) {
-                // If API works but fails to find 5 cards, maybe fallback to mock or throw
                 console.warn(`Only found ${detected.length} cards:`, detected);
-                // For better UX in demo, maybe don't fail hard if API is flaky
-                // return detected; 
             }
+            
+            // If completely failed to find enough cards, we might want to throw or return partial
+            if (detected.length === 0) {
+                 throw new Error('No cards detected via OCR');
+            }
+
             return detected;
 
         } catch (error) {
-            console.error('API Error:', error);
-            // Fallback for demo if network fails
-            return ['10', 'J', 'Q', 'K', '9']; 
+            console.error('OCR Error:', error);
+            throw error;
         }
     }
 
