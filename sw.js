@@ -1,4 +1,4 @@
-const CACHE_NAME = 'poker-bull-v4';
+const CACHE_NAME = 'poker-bull-v5';
 const ASSETS = [
     './',
     './index.html',
