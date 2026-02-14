@@ -21,6 +21,11 @@
                 <video id="camera-stream" autoplay playsinline></video>
                 <canvas id="capture-canvas" style="display:none;"></canvas>
                 
+                <div class="camera-overlay">
+                    <div class="scan-area"></div>
+                    <p class="scan-instruction">Align cards within the box</p>
+                </div>
+
                 <div id="camera-error" class="overlay-message hidden">
                     <p>Camera access required.</p>
                     <button id="retry-camera" style="margin-top:10px; padding:8px 16px;">Retry</button>

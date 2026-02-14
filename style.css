@@ -66,6 +66,62 @@ main {
     object-fit: cover;
 }
 
+.camera-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none; /* Let clicks pass through */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+}
+
+.scan-area {
+    width: 80%;
+    height: 200px; /* Adjust as needed for card aspect ratio */
+    border: 2px solid var(--accent-color);
+    border-radius: 12px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); /* Dim outside area */
+    position: relative;
+}
+
+/* Corner markers for style */
+.scan-area::before, .scan-area::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-color: var(--accent-color);
+    border-style: solid;
+}
+
+.scan-area::before {
+    top: -2px;
+    left: -2px;
+    border-width: 4px 0 0 4px;
+    border-top-left-radius: 12px;
+}
+
+.scan-area::after {
+    bottom: -2px;
+    right: -2px;
+    border-width: 0 4px 4px 0;
+    border-bottom-right-radius: 12px;
+}
+
+.scan-instruction {
+    color: white;
+    margin-top: 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
 .controls {
     position: absolute;
     bottom: 30px;
