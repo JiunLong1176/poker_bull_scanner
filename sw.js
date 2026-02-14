@@ -1,10 +1,11 @@
-const CACHE_NAME = 'poker-bull-v1';
+const CACHE_NAME = 'poker-bull-v2';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
     './app.js',
-    './manifest.json'
+    './manifest.json',
+    'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'
 ];
 
 self.addEventListener('install', (event) => {
