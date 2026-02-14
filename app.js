@@ -17,8 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const video = document.getElementById('camera-stream');
     const canvas = document.getElementById('capture-canvas');
     const scanBtn = document.getElementById('scan-btn');
-    const uploadBtn = document.getElementById('upload-btn'); // New
-    const fileUpload = document.getElementById('file-upload'); // New
     const cameraErrorDiv = document.getElementById('camera-error');
     const retryCameraBtn = document.getElementById('retry-camera');
 
@@ -158,90 +156,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     retryCameraBtn.addEventListener('click', initCamera);
 
-    // 4. Scan & Upload Handlers
-    
-    // Trigger file input
-    if (uploadBtn) {
-        uploadBtn.addEventListener('click', () => {
-            fileUpload.click();
-        });
-    }
-
-    // Handle file selection
-    if (fileUpload) {
-        fileUpload.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            loadingDiv.classList.remove('hidden');
-            resultContainer.classList.add('hidden');
-
-            try {
-                // 1. Read file as Image
-                const img = new Image();
-                const reader = new FileReader();
-                
-                await new Promise((resolve, reject) => {
-                    reader.onload = (ev) => {
-                        img.src = ev.target.result;
-                        img.onload = () => resolve();
-                        img.onerror = (err) => reject(err);
-                    };
-                    reader.readAsDataURL(file);
-                });
-
-                // 2. Draw image to canvas (to mimic video feed for consistency)
-                // We resize canvas to match image dimensions temporarily
-                const originalWidth = canvas.width;
-                const originalHeight = canvas.height;
-                
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                
-                // Show the canvas instead of video temporarily?
-                // Or just process it. InferenceJS needs an HTMLImageElement or Canvas.
-                // We can pass the 'img' object directly to inference.
-                
-                const cards = await identifyCards(img, true); // Pass true to indicate static image
-                
-                const result = calculateBull(cards);
-                displayResults(cards, result);
-                
-                // Restore canvas dims if needed, or leave it showing the result
-                // Actually identifyCards(img) will have drawn bounding boxes on 'canvas'
-                // So we should make sure canvas is visible if video was hidden
-                canvas.style.display = 'block';
-                video.style.display = 'none';
-
-            } catch (error) {
-                console.error('Upload Scan failed:', error);
-                alert('Scan failed: ' + error.message);
-            } finally {
-                loadingDiv.classList.add('hidden');
-                resultContainer.classList.remove('hidden');
-            }
-        });
-    }
-
+    // 4. Scan Button Handler
     scanBtn.addEventListener('click', async () => {
         loadingDiv.classList.remove('hidden');
         resultContainer.classList.add('hidden');
         scanBtn.disabled = true;
-        
-        // Reset display to show video again if we were viewing a static image
-        video.style.display = 'block';
-        canvas.style.display = 'none';
 
         try {
-            // Identify Cards (InferenceJS handles capture internally via video element)
-            // We pass null for base64Image since identifyCards reads from 'video' directly now
-            const cards = await identifyCards(null);
+            // Capture frame
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             
-            // Note: identifyCards now draws the result (with bounding boxes) to 'canvas'
-            // We don't need to manually capture/crop here anymore because InferenceJS
-            // runs on the full frame and gives us bounding boxes.
+            // Enhancement: Draw grayscale/high contrast for better OCR?
+            // For now, let's just capture standard.
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // To improve accuracy, we might want to crop to the center "scan area"
+            // Since we added a visual guide, users will put cards there.
+            // Let's crop to the center 80% to reduce background noise.
+            const cropWidth = canvas.width * 0.9;
+            const cropHeight = canvas.height * 0.4; // Approx height of scan box
+            const cropX = (canvas.width - cropWidth) / 2;
+            const cropY = (canvas.height - cropHeight) / 2; // Roughly center
+            
+            // Create a temp canvas for the cropped image
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = cropWidth;
+            tempCanvas.height = cropHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Draw only the center part
+            tempCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+            // Use the cropped image for OCR
+            const imageData = tempCanvas.toDataURL('image/jpeg').split(',')[1];
+
+            // Call Vision API
+            const cards = await identifyCards(imageData);
             
             // Calculate Bull
             const result = calculateBull(cards);
@@ -269,60 +221,51 @@ document.addEventListener('DOMContentLoaded', () => {
         resultContainer.classList.add('hidden');
     });
 
-    // 5. InferenceJS (Roboflow) Integration
-    const API_KEY = "a0lZzrkziIcH6witAMUQ";
-    const MODEL_NAME = "playing-cards-ow27d";
-    const MODEL_VERSION = 4; // Updated to version 4 based on previous snippet
+    // 5. Roboflow Integration
+    const ROBOFLOW_API_KEY = 'a0lZzrkziIcH6witAMUQ';
+    const ROBOFLOW_MODEL = 'playing-cards-ow27d/1'; // Public model for playing cards
+    const ROBOFLOW_URL = `https://detect.roboflow.com/${ROBOFLOW_MODEL}?api_key=${ROBOFLOW_API_KEY}`;
 
-    var inferEngine = null;
-    var modelWorkerId = null;
-
-    // Initialize Engine on Load
-    if (typeof inferencejs !== 'undefined') {
-        inferEngine = new inferencejs.InferenceEngine();
-        initModel();
-    }
-
-    async function initModel() {
+    async function identifyCards(base64Image) {
         try {
-            console.log("Loading Inference Engine...");
-            modelWorkerId = await inferEngine.startWorker(MODEL_NAME, MODEL_VERSION, API_KEY);
-            console.log("Model Worker Started:", modelWorkerId);
-        } catch (err) {
-            console.error("Failed to start model worker:", err);
-        }
-    }
+            const loadingText = document.querySelector('#loading p');
+            if (loadingText) loadingText.textContent = `Analyzing with Roboflow...`;
 
-    // Function to run a single detection on demand
-    // sourceImage: optional HTMLImageElement (for upload). If null, uses 'video'.
-    async function identifyCards(sourceImage, isStatic = false) {
-        if (!modelWorkerId) {
-            // Attempt to init if not ready
-            await initModel();
-            if (!modelWorkerId) throw new Error("Model failed to load. Check console.");
-        }
+            // Roboflow Inference API
+            const response = await fetch(ROBOFLOW_URL, {
+                method: "POST",
+                body: base64Image,
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+            });
 
-        try {
-            const inputSource = isStatic ? sourceImage : video;
-            
-            const predictions = await inferEngine.infer(modelWorkerId, new inferencejs.CVImage(inputSource));
-            console.log("Predictions:", predictions);
+            if (!response.ok) {
+                throw new Error(`Roboflow API Error: ${response.statusText}`);
+            }
 
-            if (!predictions || predictions.length === 0) {
+            const result = await response.json();
+            console.log("Roboflow Result:", result);
+
+            if (!result.predictions || result.predictions.length === 0) {
                 throw new Error('No cards detected');
             }
 
-            // Draw bounding boxes
-            drawBoundingBoxes(predictions, inputSource);
-
+            // Process predictions
+            // 1. Sort by confidence (descending)
+            // 2. Take top 5
+            // 3. Extract rank from class name (e.g. "10H" -> "10")
+            
             const validRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
             
-            const detected = predictions
+            const detected = result.predictions
                 .sort((a, b) => b.confidence - a.confidence)
                 .slice(0, 5)
                 .map(p => {
-                    const label = p.class;
-                    const match = label.match(/^(10|[2-9]|[JQKA])/i);
+                    // Class names are usually like "10H", "AH", "QD"
+                    // We need to strip the suit.
+                    // Regex: Look for 10 or single digit/letter at start
+                    const match = p.class.match(/^(10|[2-9]|[JQKA])/i);
                     return match ? match[0].toUpperCase() : null;
                 })
                 .filter(rank => rank !== null && validRanks.includes(rank));
@@ -334,46 +277,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return detected;
 
         } catch (error) {
-            console.error('Inference Detection Error:', error);
+            console.error('Vision API Error:', error);
             throw error;
         }
-    }
-
-    function drawBoundingBoxes(predictions, sourceElement) {
-        const ctx = canvas.getContext("2d");
-        
-        // Match canvas dims to source
-        const width = sourceElement.videoWidth || sourceElement.width;
-        const height = sourceElement.videoHeight || sourceElement.height;
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        // Draw the frame/image first
-        ctx.drawImage(sourceElement, 0, 0, width, height);
-
-        predictions.forEach(prediction => {
-            const x = prediction.bbox.x - prediction.bbox.width / 2;
-            const y = prediction.bbox.y - prediction.bbox.height / 2;
-            const width = prediction.bbox.width;
-            const height = prediction.bbox.height;
-
-            // Draw the box
-            ctx.strokeStyle = "#00FF00"; // Green color
-            ctx.lineWidth = 4;
-            ctx.strokeRect(x, y, width, height);
-
-            // Draw the label background
-            ctx.fillStyle = "#00FF00";
-            const text = prediction.class + " " + Math.round(prediction.confidence * 100) + "%";
-            const textWidth = ctx.measureText(text).width;
-            ctx.fillRect(x, y - 25, textWidth + 10, 25);
-
-            // Draw the text
-            ctx.fillStyle = "black";
-            ctx.font = "16px Arial";
-            ctx.fillText(text, x + 5, y - 7);
-        });
     }
 
     // 6. Poker Bull Logic & Display

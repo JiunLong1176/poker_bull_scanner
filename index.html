@@ -77,16 +77,6 @@
             </div>
             
             <div class="controls">
-                <!-- Hidden file input -->
-                <input type="file" id="file-upload" accept="image/*" style="display: none;">
-                
-                <!-- Left-side auxiliary button container -->
-                <div class="control-left" style="position: absolute; left: 30px;">
-                    <button id="upload-btn" class="icon-btn" aria-label="Upload Image">
-                        📷 <!-- Using emoji as icon for simplicity -->
-                    </button>
-                </div>
-
                 <button id="scan-btn" class="btn" aria-label="Scan Cards">
                     <div class="btn-inner"></div>
                 </button>
@@ -111,7 +101,6 @@
     </div>
 
     <!-- Tesseract removed in favor of Roboflow -->
-    <script src="https://cdn.jsdelivr.net/npm/inferencejs@1.0.11"></script>
     <script src="app.js"></script>
 </body>
 </html>
