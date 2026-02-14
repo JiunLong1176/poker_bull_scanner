@@ -204,9 +204,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Scan failed:', error);
             // Check if it's our specific "No cards" error
-            if (error.message === 'No cards detected via OCR') {
+            if (error.message === 'No cards detected' || error.message.includes('No cards')) {
                  displayResults([], { type: 'Error', message: 'No cards detected. Please try again closer or with better lighting.' });
-                 resultContainer.classList.remove('hidden'); // Ensure results are shown
+                 document.getElementById('result-container').classList.remove('hidden');
             } else {
                  alert('Failed to scan: ' + error.message);
             }
@@ -221,89 +221,65 @@ document.addEventListener('DOMContentLoaded', () => {
         resultContainer.classList.add('hidden');
     });
 
-    // 5. Tesseract.js Integration (Optimized)
+    // 5. Roboflow Integration
+    const ROBOFLOW_API_KEY = 'a0lZzrkziIcH6witAMUQ';
+    const ROBOFLOW_MODEL = 'playing-cards-ow27d/1'; // Public model for playing cards
+    const ROBOFLOW_URL = `https://detect.roboflow.com/${ROBOFLOW_MODEL}?api_key=${ROBOFLOW_API_KEY}`;
+
     async function identifyCards(base64Image) {
         try {
-            const imageSrc = `data:image/jpeg;base64,${base64Image}`;
-            
-            // Pre-process image? (Enhancement for later: use canvas to increase contrast/grayscale)
+            const loadingText = document.querySelector('#loading p');
+            if (loadingText) loadingText.textContent = `Analyzing with Roboflow...`;
 
-            const result = await Tesseract.recognize(
-                imageSrc,
-                'eng',
-                {
-                    logger: m => {
-                        console.log(m);
-                        if (m.status === 'recognizing text') {
-                            const loadingText = document.querySelector('#loading p');
-                            if (loadingText) loadingText.textContent = `Analyzing... ${Math.round(m.progress * 100)}%`;
-                        }
-                    },
-                    // Improve accuracy for card text
-                    // psm 6 = Assume a single uniform block of text (good for cards aligned in a row)
-                    tessedit_pageseg_mode: '6',
-                    // whitelist only card characters
-                    tessedit_char_whitelist: '0123456789AJQK'
+            // Roboflow Inference API
+            const response = await fetch(ROBOFLOW_URL, {
+                method: "POST",
+                body: base64Image,
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
                 }
-            );
+            });
 
-            const fullText = result.data.text;
-            console.log("Recognized Text:", fullText);
+            if (!response.ok) {
+                throw new Error(`Roboflow API Error: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log("Roboflow Result:", result);
+
+            if (!result.predictions || result.predictions.length === 0) {
+                throw new Error('No cards detected');
+            }
+
+            // Process predictions
+            // 1. Sort by confidence (descending)
+            // 2. Take top 5
+            // 3. Extract rank from class name (e.g. "10H" -> "10")
             
-            const detected = parseCardsFromText(fullText);
+            const validRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
             
-            // Validation: Ensure we found exactly 5 cards. If not, maybe retry or ask user.
+            const detected = result.predictions
+                .sort((a, b) => b.confidence - a.confidence)
+                .slice(0, 5)
+                .map(p => {
+                    // Class names are usually like "10H", "AH", "QD"
+                    // We need to strip the suit.
+                    // Regex: Look for 10 or single digit/letter at start
+                    const match = p.class.match(/^(10|[2-9]|[JQKA])/i);
+                    return match ? match[0].toUpperCase() : null;
+                })
+                .filter(rank => rank !== null && validRanks.includes(rank));
+
             if (detected.length < 5) {
                 console.warn(`Only found ${detected.length} cards:`, detected);
-                 // If we found say 3 or 4 cards, we might want to show them and ask user to rescan or edit?
-                 // For now, let's just return what we found but user will see incomplete result.
-            }
-            
-            if (detected.length === 0) {
-                 throw new Error('No cards detected via OCR');
             }
 
             return detected;
 
         } catch (error) {
-            console.error('OCR Error:', error);
+            console.error('Vision API Error:', error);
             throw error;
         }
-    }
-
-    function parseCardsFromText(text) {
-        const validCards = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-        
-        // Pre-cleaning: Fix common OCR mistakes specifically for playing cards
-        let cleanText = text.toUpperCase()
-            .replace(/1O/g, '10') // O instead of 0
-            .replace(/l/g, '1')   // l instead of 1 (though 1 isn't a card, it might be part of 10)
-            .replace(/S/g, '5')   // S often mistaken for 5
-            .replace(/Z/g, '2')   // Z often mistaken for 2
-            .replace(/O/g, '0');  // O often mistaken for 0
-            
-        // 1. Look specifically for "10" first as it's the only 2-digit card
-        const detected = [];
-        
-        // Extract all occurrences of '10' first
-        const tens = cleanText.match(/10/g);
-        if (tens) {
-            tens.forEach(() => {
-                if(detected.length < 5) detected.push('10');
-            });
-            cleanText = cleanText.replace(/10/g, ''); // Remove found 10s
-        }
-
-        // 2. Look for remaining single characters
-        // We only care about valid card characters now
-        const chars = cleanText.replace(/[^2-9AJQK]/g, '').split('');
-        
-        for (const char of chars) {
-            if (detected.length >= 5) break;
-            detected.push(char);
-        }
-
-        return detected;
     }
 
     // 6. Poker Bull Logic & Display
