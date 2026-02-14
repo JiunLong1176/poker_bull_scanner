@@ -129,28 +129,61 @@ document.addEventListener('DOMContentLoaded', () => {
     function parseCardsFromText(text) {
         const validCards = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
         
-        // Strategy: Look for "10" first, remove it, then look for single chars
-        let remainingText = text.toUpperCase();
+        // Strategy: Improve noise filtering.
+        // Tesseract often misinterprets random noise as single characters (like 'I' as '1', 'O' as '0', etc.)
+        // We will stricter parsing.
+        
+        // 1. Clean the text: remove all non-alphanumeric characters except spaces
+        let cleanText = text.toUpperCase().replace(/[^A-Z0-9\s]/g, ' ');
+        
+        // 2. Split by whitespace to check for isolated tokens first (often cards are distinct)
+        const tokens = cleanText.split(/\s+/);
         const detected = [];
 
-        // 1. Extract all '10's
-        // We replace '10' with a placeholder or just extract it
-        const tens = remainingText.match(/10/g);
-        if (tens) {
-            tens.forEach(() => detected.push('10'));
-            remainingText = remainingText.replace(/10/g, ''); 
-        }
-
-        // 2. Extract single char cards
-        const chars = remainingText.replace(/[^0-9A-Z]/g, '').split('');
-        for (const char of chars) {
-            if (validCards.includes(char)) {
-                detected.push(char);
+        // Helper to add if valid and not over limit
+        const addCard = (c) => {
+            if (detected.length < 5 && validCards.includes(c)) {
+                detected.push(c);
             }
+        };
+
+        // 3. Process tokens
+        tokens.forEach(token => {
+            if (detected.length >= 5) return;
+
+            // Direct match (e.g., "10", "K", "A")
+            if (validCards.includes(token)) {
+                addCard(token);
+                return;
+            }
+
+            // If token is stuck together like "10JQKA", try to split
+            // But be careful of noise like "A123" which might just be garbage
+            // We only split if the token is relatively short to avoid reading a whole paragraph of noise
+            if (token.length > 1 && token.length < 10) {
+                 // Check for '10' specifically inside the token
+                 let tempToken = token;
+                 while(tempToken.includes('10') && detected.length < 5) {
+                     addCard('10');
+                     tempToken = tempToken.replace('10', '');
+                 }
+                 
+                 // Check remaining chars
+                 for (const char of tempToken) {
+                     addCard(char);
+                 }
+            }
+        });
+        
+        // If we found too few, do a desperate scan of the raw string but be stricter about noise
+        // (Previously we just took ANY matching char, which caused the "table scanning" issue)
+        if (detected.length < 5) {
+             // If we have very little confidence (mostly noise), it's better to return empty
+             // than to hallucinate a hand.
+             // Heuristic: If we found 0-2 cards from tokens, maybe it's just noise.
         }
 
-        // Return first 5 found
-        return detected.slice(0, 5);
+        return detected;
     }
 
     // 6. Poker Bull Logic & Display
