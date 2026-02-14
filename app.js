@@ -223,56 +223,90 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 5. Roboflow Integration
     const ROBOFLOW_API_KEY = 'a0lZzrkziIcH6witAMUQ';
-    const ROBOFLOW_MODEL = 'playing-cards-ow27d/1'; // Public model for playing cards
-    const ROBOFLOW_URL = `https://detect.roboflow.com/${ROBOFLOW_MODEL}?api_key=${ROBOFLOW_API_KEY}`;
+    const ROBOFLOW_WORKFLOW_URL = 'https://serverless.roboflow.com/pokercardscanner/workflows/detect-and-classify-2';
 
     async function identifyCards(base64Image) {
         try {
             const loadingText = document.querySelector('#loading p');
             if (loadingText) loadingText.textContent = `Analyzing with Roboflow...`;
 
-            // Roboflow Inference API
-            const response = await fetch(ROBOFLOW_URL, {
-                method: "POST",
-                body: base64Image,
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
+            // Note: Roboflow Workflows usually require an image URL or specific base64 format.
+            // The provided snippet uses "image": {"type": "url", "value": "..."}
+            // For base64, the type is usually "base64".
+            
+            const requestBody = {
+                api_key: ROBOFLOW_API_KEY,
+                inputs: {
+                    // Pass base64 data directly
+                    "image": { "type": "base64", "value": base64Image }
                 }
+            };
+
+            const response = await fetch(ROBOFLOW_WORKFLOW_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
-                throw new Error(`Roboflow API Error: ${response.statusText}`);
+                const errText = await response.text();
+                throw new Error(`Roboflow API Error: ${response.status} - ${errText}`);
             }
 
             const result = await response.json();
             console.log("Roboflow Result:", result);
 
-            if (!result.predictions || result.predictions.length === 0) {
+            // Parse Workflow Result
+            // Structure depends on the workflow. Usually outputs are in `outputs`.
+            // Let's assume the workflow returns a list of detections/classifications.
+            // We need to inspect the `result` object structure based on the workflow definition.
+            // Commonly it's result.outputs[0].predictions or similar if it's a model step.
+            // If the user didn't specify the output format, we'll try to find an array of detections.
+            
+            // Heuristic search for predictions array in the response
+            let predictions = [];
+            
+            if (result.outputs) {
+                // If it's a workflow, outputs might be an object containing keys for each block
+                // e.g. result.outputs.detection_model.predictions
+                // or just result.outputs if it's simpler.
+                // Let's look for any array that looks like predictions
+                for (const key in result.outputs) {
+                    const output = result.outputs[key];
+                    if (output.predictions && Array.isArray(output.predictions)) {
+                        predictions = output.predictions;
+                        break;
+                    }
+                     // Direct array?
+                    if (Array.isArray(output) && output.length > 0 && output[0].class) {
+                        predictions = output;
+                        break;
+                    }
+                }
+            } else if (result.predictions) {
+                predictions = result.predictions;
+            }
+
+            if (!predictions || predictions.length === 0) {
                 throw new Error('No cards detected');
             }
 
-            // Process predictions
-            // 1. Sort by confidence (descending)
-            // 2. Take top 5
-            // 3. Extract rank from class name (e.g. "10H" -> "10")
-            
             const validRanks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
             
-            const detected = result.predictions
+            const detected = predictions
                 .sort((a, b) => b.confidence - a.confidence)
                 .slice(0, 5)
                 .map(p => {
-                    // Class names are usually like "10H", "AH", "QD"
-                    // We need to strip the suit.
-                    // Regex: Look for 10 or single digit/letter at start
-                    const match = p.class.match(/^(10|[2-9]|[JQKA])/i);
+                    // Class name parsing (e.g., "10H" -> "10")
+                    const className = p.class || p.prediction; // sometimes 'class', sometimes 'prediction'
+                    if (!className) return null;
+                    
+                    const match = className.match(/^(10|[2-9]|[JQKA])/i);
                     return match ? match[0].toUpperCase() : null;
                 })
                 .filter(rank => rank !== null && validRanks.includes(rank));
-
-            if (detected.length < 5) {
-                console.warn(`Only found ${detected.length} cards:`, detected);
-            }
 
             return detected;
 
