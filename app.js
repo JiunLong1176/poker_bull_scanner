@@ -48,9 +48,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const context = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
+            
+            // Enhancement: Draw grayscale/high contrast for better OCR?
+            // For now, let's just capture standard.
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            const imageData = canvas.toDataURL('image/jpeg').split(',')[1];
+            // To improve accuracy, we might want to crop to the center "scan area"
+            // Since we added a visual guide, users will put cards there.
+            // Let's crop to the center 80% to reduce background noise.
+            const cropWidth = canvas.width * 0.9;
+            const cropHeight = canvas.height * 0.4; // Approx height of scan box
+            const cropX = (canvas.width - cropWidth) / 2;
+            const cropY = (canvas.height - cropHeight) / 2; // Roughly center
+            
+            // Create a temp canvas for the cropped image
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = cropWidth;
+            tempCanvas.height = cropHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Draw only the center part
+            tempCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+            // Use the cropped image for OCR
+            const imageData = tempCanvas.toDataURL('image/jpeg').split(',')[1];
 
             // Call Vision API
             const cards = await identifyCards(imageData);
@@ -81,14 +102,12 @@ document.addEventListener('DOMContentLoaded', () => {
         resultContainer.classList.add('hidden');
     });
 
-    // 5. Tesseract.js Integration
+    // 5. Tesseract.js Integration (Optimized)
     async function identifyCards(base64Image) {
         try {
-            // Tesseract.js works with image URLs or base64
-            // We need to add the prefix for base64 if it's missing, though our caller passes raw base64 usually
-            // but Tesseract.recognize handles various inputs.
-            // Let's ensure we pass a valid image source.
             const imageSrc = `data:image/jpeg;base64,${base64Image}`;
+            
+            // Pre-process image? (Enhancement for later: use canvas to increase contrast/grayscale)
 
             const result = await Tesseract.recognize(
                 imageSrc,
@@ -100,7 +119,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             const loadingText = document.querySelector('#loading p');
                             if (loadingText) loadingText.textContent = `Analyzing... ${Math.round(m.progress * 100)}%`;
                         }
-                    }
+                    },
+                    // Improve accuracy for card text
+                    // psm 6 = Assume a single uniform block of text (good for cards aligned in a row)
+                    tessedit_pageseg_mode: '6',
+                    // whitelist only card characters
+                    tessedit_char_whitelist: '0123456789AJQK'
                 }
             );
 
@@ -109,11 +133,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const detected = parseCardsFromText(fullText);
             
+            // Validation: Ensure we found exactly 5 cards. If not, maybe retry or ask user.
             if (detected.length < 5) {
                 console.warn(`Only found ${detected.length} cards:`, detected);
+                 // If we found say 3 or 4 cards, we might want to show them and ask user to rescan or edit?
+                 // For now, let's just return what we found but user will see incomplete result.
             }
             
-            // If completely failed to find enough cards, we might want to throw or return partial
             if (detected.length === 0) {
                  throw new Error('No cards detected via OCR');
             }
@@ -129,58 +155,33 @@ document.addEventListener('DOMContentLoaded', () => {
     function parseCardsFromText(text) {
         const validCards = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
         
-        // Strategy: Improve noise filtering.
-        // Tesseract often misinterprets random noise as single characters (like 'I' as '1', 'O' as '0', etc.)
-        // We will stricter parsing.
-        
-        // 1. Clean the text: remove all non-alphanumeric characters except spaces
-        let cleanText = text.toUpperCase().replace(/[^A-Z0-9\s]/g, ' ');
-        
-        // 2. Split by whitespace to check for isolated tokens first (often cards are distinct)
-        const tokens = cleanText.split(/\s+/);
+        // Pre-cleaning: Fix common OCR mistakes specifically for playing cards
+        let cleanText = text.toUpperCase()
+            .replace(/1O/g, '10') // O instead of 0
+            .replace(/l/g, '1')   // l instead of 1 (though 1 isn't a card, it might be part of 10)
+            .replace(/S/g, '5')   // S often mistaken for 5
+            .replace(/Z/g, '2')   // Z often mistaken for 2
+            .replace(/O/g, '0');  // O often mistaken for 0
+            
+        // 1. Look specifically for "10" first as it's the only 2-digit card
         const detected = [];
-
-        // Helper to add if valid and not over limit
-        const addCard = (c) => {
-            if (detected.length < 5 && validCards.includes(c)) {
-                detected.push(c);
-            }
-        };
-
-        // 3. Process tokens
-        tokens.forEach(token => {
-            if (detected.length >= 5) return;
-
-            // Direct match (e.g., "10", "K", "A")
-            if (validCards.includes(token)) {
-                addCard(token);
-                return;
-            }
-
-            // If token is stuck together like "10JQKA", try to split
-            // But be careful of noise like "A123" which might just be garbage
-            // We only split if the token is relatively short to avoid reading a whole paragraph of noise
-            if (token.length > 1 && token.length < 10) {
-                 // Check for '10' specifically inside the token
-                 let tempToken = token;
-                 while(tempToken.includes('10') && detected.length < 5) {
-                     addCard('10');
-                     tempToken = tempToken.replace('10', '');
-                 }
-                 
-                 // Check remaining chars
-                 for (const char of tempToken) {
-                     addCard(char);
-                 }
-            }
-        });
         
-        // If we found too few, do a desperate scan of the raw string but be stricter about noise
-        // (Previously we just took ANY matching char, which caused the "table scanning" issue)
-        if (detected.length < 5) {
-             // If we have very little confidence (mostly noise), it's better to return empty
-             // than to hallucinate a hand.
-             // Heuristic: If we found 0-2 cards from tokens, maybe it's just noise.
+        // Extract all occurrences of '10' first
+        const tens = cleanText.match(/10/g);
+        if (tens) {
+            tens.forEach(() => {
+                if(detected.length < 5) detected.push('10');
+            });
+            cleanText = cleanText.replace(/10/g, ''); // Remove found 10s
+        }
+
+        // 2. Look for remaining single characters
+        // We only care about valid card characters now
+        const chars = cleanText.replace(/[^2-9AJQK]/g, '').split('');
+        
+        for (const char of chars) {
+            if (detected.length >= 5) break;
+            detected.push(char);
         }
 
         return detected;
