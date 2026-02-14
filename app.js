@@ -401,35 +401,46 @@ document.addEventListener('DOMContentLoaded', () => {
         const baseValues = cards.map(getCardValue);
         let bestOutcome = solve(baseValues);
 
-        // 2. Variant Rule Check: "3 can be 6" (and maybe 6 can be 3?)
-        // The user specifically said "3 can change 6".
-        // Let's generate permutations if there are 3s or 6s.
-        // Actually, let's strictly follow "3 can change 6".
-        // Does 6 change to 3? Usually these rules are bidirectional or specific.
-        // Let's allow 3 -> 6 substitution to see if it improves the hand.
+        // 2. Variant Rule Check: "3 can be 6" AND "6 can be 3" (Bidirectional)
+        // User specific rules: 3 can substitute 6, and 6 can substitute 3.
         
+        // Find indices of all '3's and '6's
         const indicesOf3 = [];
-        cards.forEach((c, idx) => { if (c === '3') indicesOf3.push(idx); });
+        const indicesOf6 = [];
+        
+        cards.forEach((c, idx) => {
+            if (c === '3') indicesOf3.push(idx);
+            if (c === '6') indicesOf6.push(idx);
+        });
 
-        if (indicesOf3.length > 0) {
-            // We have 3s. Let's try permutations where each 3 could be a 6.
-            // 2^n permutations.
-            const numPermutations = 1 << indicesOf3.length;
+        const variableIndices = [...indicesOf3, ...indicesOf6];
+
+        if (variableIndices.length > 0) {
+            // Permutations for all variable cards (3s and 6s)
+            // Each card at these indices can be either 3 or 6.
+            const numPermutations = 1 << variableIndices.length;
             
-            for (let i = 1; i < numPermutations; i++) { // Start at 1 because 0 is original
+            for (let i = 0; i < numPermutations; i++) {
                 const newValues = [...baseValues];
-                for (let bit = 0; bit < indicesOf3.length; bit++) {
+                
+                for (let bit = 0; bit < variableIndices.length; bit++) {
+                    // index in original array
+                    const idx = variableIndices[bit];
+                    
+                    // If bit is 0, use 3. If bit is 1, use 6.
+                    // (Or swap logic, just need to cover both states)
                     if ((i >> bit) & 1) {
-                        newValues[indicesOf3[bit]] = 6; // Swap value to 6
+                        newValues[idx] = 6;
+                    } else {
+                        newValues[idx] = 3;
                     }
                 }
                 
                 const outcome = solve(newValues);
+                
                 if (outcome.type === 'Bull') {
                      if (bestOutcome.type === 'No Bull' || outcome.value > bestOutcome.value) {
                          bestOutcome = outcome;
-                         // Mark that we used a variant rule?
-                         // bestOutcome.variant = "3 as 6";
                      }
                 }
             }
